@@ -1,0 +1,5 @@
+# 설치 단계(10분 제한)에서 설치됩니다. 필요한 것만 둡니다.
+torch>=2.5
+segmentation-models-pytorch>=0.5
+numpy
+opencv-python-headless

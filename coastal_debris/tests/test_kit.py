@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "submission" / "assets"))
 
 from debris_kit.losses import tolerant_f_loss  # noqa: E402
 from debris_kit.metric import (competition_score, mean_shape_from_all_full, patch_shape_f,  # noqa: E402

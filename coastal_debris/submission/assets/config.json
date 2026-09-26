@@ -1,0 +1,10 @@
+{
+  "models": [
+    "model/unet_r18_debris_lite.pt"
+  ],
+  "tta": 8,
+  "cpu_tta": 2,
+  "batch": 32,
+  "time_budget_min": 70,
+  "probe": null
+}
