@@ -1,0 +1,10 @@
+{
+  "models": [
+    "model/unet_r18_cd.pt"
+  ],
+  "tta": 8,
+  "cpu_tta": 2,
+  "batch": 16,
+  "time_budget_min": 70,
+  "probe": null
+}
