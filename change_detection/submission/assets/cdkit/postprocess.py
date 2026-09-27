@@ -15,18 +15,30 @@ from . import CLASSES, MIN_POS_AREA
 from .geom import mask_to_polygons, polygons_to_geometry
 
 DEFAULT_CLASS_RULES = {
-    "thr_abs": 0.5,        # 화소 임계값 상한
+    "argmax": True,        # True: 배경/증축/벌목 중 이 클래스 확률이 가장 큰 화소만 후보 (베이스라인 방식)
+    "thr_abs": 0.0,        # 화소 임계값 상한 (argmax 와 함께 쓰면 추가 조건)
     "thr_rel": 1.0,        # 화소 임계값 = min(thr_abs, thr_rel * 패치 최대확률)
     "close": 0,            # closing 커널 (0=끔). 증축은 곧은 변이라 작게, 벌목은 크게 쓰는 경향
-    "min_cc": 30,          # 이 면적 미만 조각 제거 (베이스라인과 같은 30). 전부 지워지면 가장 큰 것 하나는 남김
-    "guarantee_px": 24,    # 양성 판정인데 이보다 작으면 확장 (20 미만이면 채점상 음성이라서)
-    "t_max": 0.5,          # 분할 최대확률이 이 이상이고
+    "min_cc": 30,          # 이 면적 미만 조각 제거 (베이스라인과 같은 30)
+    "keep_largest": False, # 조각이 전부 min_cc 미만일 때 가장 큰 것 하나는 남길지 (베이스라인은 전부 지움)
+    "guarantee_px": 0,     # 양성 판정인데 이보다 작으면 확장 (20 미만이면 채점상 음성이라서)
+    "t_max": 0.0,          # 분할 최대확률이 이 이상이고
     "min_area": 20,        # 후처리 면적이 이 이상이면 양성
     "t_cls": None,         # 분류 헤드 확률이 이 이상이면 양성 (None 이면 미사용)
     "simplify": 0.5,       # 외곽선 단순화 허용오차(px). 채점 허용오차 1px 안
 }
+# 기본값 = 주최 측 베이스라인 노트북과 같은 동작 (argmax -> 30화소 미만 조각 제거 -> 20화소 미만이면 빈 예측).
+# 검증셋이 생기면 tune_rules.py 결과로 바꾸십시오.
+BASELINE_RULES = {c: dict(DEFAULT_CLASS_RULES) for c in CLASSES}
 DEFAULT_RULES = {c: dict(DEFAULT_CLASS_RULES) for c in CLASSES}
-BASELINE_RULES = {c: {**DEFAULT_CLASS_RULES, "guarantee_px": 0} for c in CLASSES}
+
+
+def argmax_filter(probs: np.ndarray, k: int) -> np.ndarray:
+    """probs (2,H,W) [증축, 벌목] 에서 클래스 k 가 배경·다른 클래스보다 큰 화소만 남긴 확률."""
+    bg = 1.0 - probs[0] - probs[1]
+    p, o = probs[k], probs[1 - k]
+    return np.where((p > o) & (p > bg), p, 0.0).astype(np.float32)
+
 
 _K3 = np.ones((3, 3), np.uint8)
 
@@ -49,13 +61,13 @@ def valid_mask(pre: np.ndarray, post: np.ndarray, margin: int = 1) -> np.ndarray
     return ~nd
 
 
-def _remove_small_cc(m, min_cc):
+def _remove_small_cc(m, min_cc, keep_largest=False):
     n, lab, st, _ = cv2.connectedComponentsWithStats(m, connectivity=4)
-    if n <= 2:
+    if n <= 1:
         return m
     areas = st[1:, cv2.CC_STAT_AREA]
     keep = np.flatnonzero(areas >= min_cc) + 1
-    if keep.size == 0:
+    if keep.size == 0 and keep_largest:
         keep = np.array([int(np.argmax(areas)) + 1])
     return np.isin(lab, keep).astype(np.uint8)
 
@@ -86,12 +98,12 @@ def make_mask(prob: np.ndarray, r: dict, valid: np.ndarray | None = None) -> tup
         valid = np.ones(prob.shape, bool)
     maxp = float(prob.max())
     thr = min(float(r["thr_abs"]), float(r["thr_rel"]) * maxp)
-    m = ((prob >= thr) & valid & (prob > 0)).astype(np.uint8)
+    m = ((prob >= thr) & valid & (prob > 0)).astype(np.uint8)   # argmax 모드면 prob 는 이미 걸러진 값
     if r.get("close") and m.any():
         k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(r["close"]),) * 2)
         m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, k) & valid.astype(np.uint8)
     if r.get("min_cc") and m.any():
-        m = _remove_small_cc(m, int(r["min_cc"]))
+        m = _remove_small_cc(m, int(r["min_cc"]), bool(r.get("keep_largest", False)))
     area = int(m.sum())
     g = int(r.get("guarantee_px") or 0)
     if g and area < g:
@@ -120,7 +132,8 @@ def decide(probs: np.ndarray, cls_probs, rules: dict, valid=None) -> dict:
     for k, c in enumerate(CLASSES):
         r = {**DEFAULT_CLASS_RULES, **rules.get(c, {})}
         cp = None if cls_probs is None else float(cls_probs[k])
-        m = decide_class(probs[k], cp, r, valid)
+        p = argmax_filter(probs, k) if r.get("argmax") else probs[k]
+        m = decide_class(p, cp, r, valid)
         polys = mask_to_polygons(m, simplify_px=float(r.get("simplify", 0.5))) if m.any() else []
         if polys and polygons_to_geometry(polys).area < MIN_POS_AREA:   # 단순화로 20 밑으로 줄어든 경우
             polys = []

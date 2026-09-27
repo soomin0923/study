@@ -91,11 +91,22 @@ def test_valid_mask_and_decide():
     assert out["tree_removal"] == []
 
 
+def test_default_is_baseline_argmax():
+    """기본 규칙 = 베이스라인: 3클래스 중 최대인 화소, 30 미만 조각은 전부 제거."""
+    probs = np.zeros((2, 256, 256), np.float32)
+    probs[0, 10:30, 10:30] = 0.4                               # 40%지만 배경(0.35)·벌목(0.25)보다 큼
+    probs[1, 10:30, 10:30] = 0.25
+    probs[1, 100:104, 100:105] = 0.9                           # 20화소 조각 -> min_cc 30 에 걸려 제거
+    out = decide(probs, None, {})
+    assert polygons_to_geometry(out["new_building"]).area == pytest.approx(400, abs=2)
+    assert out["tree_removal"] == []
+
+
 def test_guarantee_min_area():
     prob = np.zeros((256, 256), np.float32)
     prob[100:103, 100:103] = 0.9                               # 9화소
     prob[95:110, 95:110] += 0.2
-    r = {**DEFAULT_CLASS_RULES, "min_area": 0, "min_cc": 0}
+    r = {**DEFAULT_CLASS_RULES, "argmax": False, "thr_abs": 0.5, "min_area": 0, "min_cc": 0, "guarantee_px": 24}
     assert decide_class(prob, None, r).sum() >= 20
     assert decide_class(prob, None, {**r, "guarantee_px": 0}).sum() == 0
 

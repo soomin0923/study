@@ -76,7 +76,8 @@ def main():
     ap.add_argument("--models", nargs="*", default=[])
     ap.add_argument("--rules", default=None, help="tune_rules.py 결과 json (없으면 템플릿의 rules.json)")
     ap.add_argument("--probe", choices=["empty"], default=None)
-    ap.add_argument("--tta", type=int, default=8)
+    ap.add_argument("--tta", type=int, default=1,
+                    help="1=끔(베이스라인과 동일). 8=D4 전체. 켜면 결과가 크게 달라질 수 있으니 검증셋으로 확인 후 사용")
     ap.add_argument("--cpu-tta", type=int, default=2)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--time-budget-min", type=float, default=70)

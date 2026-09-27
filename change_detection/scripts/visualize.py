@@ -15,7 +15,7 @@ from _common import ROOT  # noqa: F401
 from cdkit import CLASSES, MIN_POS_AREA
 from cdkit.data import read_mask, read_rgb
 from cdkit.metric import shape_f_mask
-from cdkit.postprocess import DEFAULT_CLASS_RULES, DEFAULT_RULES, decide_class
+from cdkit.postprocess import DEFAULT_CLASS_RULES, DEFAULT_RULES, argmax_filter, decide_class
 
 FILES = {"new_building": "building.png", "tree_removal": "tree.png"}
 
@@ -42,7 +42,8 @@ def main():
         r = {**DEFAULT_CLASS_RULES, **rules.get(c, {})}
         groups = {"FP": [], "FN": [], "low_shape": []}
         for n, i in enumerate(z["ids"]):
-            p = z["seg"][n, k].astype(np.float32)
+            seg_n = z["seg"][n].astype(np.float32)
+            p = argmax_filter(seg_n, k) if r.get("argmax") else seg_n[k]
             cp = None if np.isnan(z["cls"][n, k]) else float(z["cls"][n, k])
             gp = Path(a.val) / i / FILES[c]
             g = read_mask(gp) if gp.exists() else np.zeros((256, 256), np.uint8)

@@ -1,22 +1,26 @@
 {
   "new_building": {
-    "thr_abs": 0.5,
+    "argmax": true,
+    "thr_abs": 0.0,
     "thr_rel": 1.0,
     "close": 0,
     "min_cc": 30,
-    "guarantee_px": 24,
-    "t_max": 0.5,
+    "keep_largest": false,
+    "guarantee_px": 0,
+    "t_max": 0.0,
     "min_area": 20,
     "t_cls": null,
     "simplify": 0.5
   },
   "tree_removal": {
-    "thr_abs": 0.5,
+    "argmax": true,
+    "thr_abs": 0.0,
     "thr_rel": 1.0,
     "close": 0,
     "min_cc": 30,
-    "guarantee_px": 24,
-    "t_max": 0.5,
+    "keep_largest": false,
+    "guarantee_px": 0,
+    "t_max": 0.0,
     "min_area": 20,
     "t_cls": null,
     "simplify": 0.5

@@ -18,16 +18,17 @@ from _common import ROOT  # noqa: F401
 from cdkit import CLASSES, MIN_POS_AREA
 from cdkit.data import read_mask
 from cdkit.metric import class_score, prevalence_weights, shape_f_mask
-from cdkit.postprocess import BASELINE_RULES, DEFAULT_CLASS_RULES, DEFAULT_RULES, make_mask
+from cdkit.postprocess import BASELINE_RULES, DEFAULT_CLASS_RULES, DEFAULT_RULES, argmax_filter, make_mask
 
 MASK_GRID = {
-    "thr_abs": [0.3, 0.4, 0.5, 0.6],
+    "argmax": [True, False],
+    "thr_abs": [0.0, 0.3, 0.4, 0.5, 0.6],
     "thr_rel": [1.0, 0.7],
     "close": [0, 3, 5],
     "min_cc": [0, 15, 30, 60],
     "guarantee_px": [0, 24, 40],
 }
-T_MAX = [float(round(x, 2)) for x in np.arange(0.2, 0.96, 0.05)]
+T_MAX = [0.0] + [float(round(x, 2)) for x in np.arange(0.2, 0.96, 0.05)]
 MIN_AREA = [20, 30, 50, 80, 120, 200]
 T_CLS = [None] + [float(round(x, 2)) for x in np.arange(0.1, 0.96, 0.05)]
 FILES = {"new_building": "building.png", "tree_removal": "tree.png"}
@@ -41,7 +42,9 @@ def load_gt(val_dir, ids, cls):
     return out
 
 
-def mask_stats(prob, valid, gts, r):
+def mask_stats(probs, valid, gts, r):
+    """probs = (일반 확률, argmax 로 걸러진 확률) 쌍. 규칙의 argmax 설정에 맞는 쪽을 씁니다."""
+    prob = probs[1] if r.get("argmax") else probs[0]
     area, final, shape = [], [], []
     for p, v, g in zip(prob, valid, gts):
         m, a = make_mask(p.astype(np.float32), r, v)
@@ -74,24 +77,29 @@ def main():
     cls_all = z["cls"].astype(np.float32)
     best_rules, summary = {}, {}
     for k, c in enumerate(CLASSES):
-        prob = seg[:, k]
+        prob = seg[:, k].astype(np.float32)
+        prob_am = np.stack([argmax_filter(s_.astype(np.float32), k) for s_ in seg])
+        probs = (prob, prob_am)
         cls = None if np.isnan(cls_all[:, k]).all() else cls_all[:, k]
         gts = load_gt(a.val, ids, c)
         gt_pos = np.array([g.any() for g in gts])
         w = prevalence_weights(gt_pos, ratios[c]) if c in ratios else None
         npos = int(gt_pos.sum())
         print(f"\n=== {c}: 검증 쌍 {len(ids)} (양성 {npos}), 분류헤드 {'있음' if cls is not None else '없음'}")
-        maxp = prob.reshape(len(prob), -1).max(1).astype(np.float32)
+        maxps = (prob.reshape(len(prob), -1).max(1), prob_am.reshape(len(prob), -1).max(1))
         ref = {}
         for name, r in (("baseline", BASELINE_RULES[c]), ("default", DEFAULT_RULES[c])):
-            area, final, shape = mask_stats(prob, valid, gts, r)
-            ref[name] = score(maxp, area, final, shape, cls, gt_pos, r, w)
+            area, final, shape = mask_stats(probs, valid, gts, r)
+            ref[name] = score(maxps[bool(r.get("argmax"))], area, final, shape, cls, gt_pos, r, w)
             print(f"[{name}] {ref[name]['score']:.4f} f1 {ref[name]['f1']:.3f} shape {ref[name]['shape']:.3f}")
         results = []
         combos = list(itertools.product(*MASK_GRID.values()))
         for ci, vals in enumerate(combos):
             mr = {**DEFAULT_CLASS_RULES, **dict(zip(MASK_GRID, vals))}
-            area, final, shape = mask_stats(prob, valid, gts, mr)
+            if not mr["argmax"] and mr["thr_abs"] == 0.0:
+                continue                                    # 임계값 없이 전부 칠하는 무의미한 조합
+            maxp = maxps[bool(mr["argmax"])]
+            area, final, shape = mask_stats(probs, valid, gts, mr)
             for t_max, min_area, t_cls in itertools.product(T_MAX, MIN_AREA, T_CLS if cls is not None else [None]):
                 g = {**mr, "t_max": t_max, "min_area": min_area, "t_cls": t_cls}
                 results.append((score(maxp, area, final, shape, cls, gt_pos, g, w), g))

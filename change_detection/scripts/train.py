@@ -22,7 +22,7 @@ from cdkit.infer import predict_probs
 from cdkit.losses import cd_loss
 from cdkit.metric import class_score, shape_f_mask
 from cdkit.model import CDNet, init_from_baseline, save_checkpoint
-from cdkit.postprocess import DEFAULT_CLASS_RULES, make_mask, valid_mask
+from cdkit.postprocess import DEFAULT_CLASS_RULES, argmax_filter, make_mask, valid_mask
 
 
 def quick_val(model, items, device):
@@ -42,16 +42,18 @@ def quick_val(model, items, device):
     for k, c in enumerate(CLASSES):
         gts = [(t == k + 1) for t in tgts]
         gt_pos = np.array([g.any() for g in gts])
-        prob = seg[:, k] * np.stack(valid)
-        maxp = prob.reshape(len(prob), -1).max(1)
+        v = np.stack(valid)
         best = None
-        for thr in (0.3, 0.4, 0.5):
-            r = {**DEFAULT_CLASS_RULES, "thr_abs": thr}
+        for thr in ("argmax", 0.3, 0.4, 0.5):
+            am = thr == "argmax"
+            prob = (np.stack([argmax_filter(s_, k) for s_ in seg]) if am else seg[:, k]) * v
+            maxp = prob.reshape(len(prob), -1).max(1)
+            r = {**DEFAULT_CLASS_RULES, "argmax": am, "thr_abs": 0.0 if am else thr}
             ms = [make_mask(p, r, v) for p, v in zip(prob, valid)]
             area = np.array([a for _, a in ms])
             final = np.array([int(m.sum()) for m, _ in ms])
             shape = np.array([shape_f_mask(m, g) if g.any() else 0.0 for (m, _), g in zip(ms, gts)])
-            gates = [(t, None) for t in np.arange(0.2, 0.91, 0.1)]
+            gates = [(t, None) for t in [0.0, *np.arange(0.2, 0.91, 0.1)]]
             if cls is not None:
                 gates += [(9.0, t) for t in np.arange(0.2, 0.81, 0.1)]
             for tm, tc in gates:
