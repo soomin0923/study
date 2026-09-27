@@ -31,6 +31,7 @@ scripts/
   predict_folder.py  tune_rules.py  visualize.py  train.py  make_pseudo_labels.py
   prepare_aihub.py (pair: 실제 전/후 쌍 / synth: 한 시점 영상에서 변화 합성)
   build_submission.py  validate_submission.py  probe_calc.py  _notebook_src.py
+notebooks/workflow.ipynb   학습 → zip → 리허설 → (디버그)제출을 한 노트북에서
 tests/  test_kit.py  smoke_e2e.sh  make_synthetic.py
 ```
 
@@ -52,10 +53,39 @@ data/<소스>/<id>/pre.png  post.png  building.png  tree.png  [ignore.png]
 ```
 마스크는 0=배경, >0=해당 변화. 마스크 파일이 없으면 그 클래스는 '변화 없음'.
 
+## 환경 설정
+
+Python 3.11 을 권장합니다 (torch>=2.5, numpy 2 와 모두 호환). 채점 서버는 제출할 때 `requirements.txt` 로
+최신 torch·smp 를 설치하므로, 로컬도 같은 메이저 버전(torch 2.x, smp 0.5.x)을 쓰면 됩니다.
+
+**NVIDIA GPU (Windows/Linux)** - 학습까지 할 때
+```bash
+conda create -n knps python=3.11 -y && conda activate knps          # 또는 uv venv --python 3.11
+nvidia-smi                                                           # 드라이버의 CUDA 버전 확인
+pip install torch --index-url https://download.pytorch.org/whl/cu126 # 드라이버에 맞는 휠 (pytorch.org 참고)
+pip install -r requirements-dev.txt
+python -m ipykernel install --user --name knps --display-name "KNPS (py3.11)"
+python -c "import torch; print(torch.cuda.is_available())"           # True 여야 GPU 학습
+```
+
+**GPU 없음 / Mac** - 규칙 튜닝·제출까지는 CPU 로 충분 (학습은 느림). 같은 방법에서 torch 휠만 기본으로 설치.
+
+**Google Colab** - 무료 GPU. `aifactory` 가 Colab 을 지원하고, 참여키는 Colab Secrets 에 `AIF_API_KEY` 로 넣으면 됩니다.
+
+### 제출 도구(aifactory) 동작 - 꼭 알아둘 것
+- `%aifactory submit` 은 **그 셀을 실행한 노트북 자체**를 `predict.ipynb` 로 올리고, **현재 폴더의** `requirements.txt` 와
+  `assets/` 만 함께 올립니다. 학습 노트북에서 그냥 실행하면 학습 노트북이 채점 서버에서 돌아갑니다.
+  → `notebooks/workflow.ipynb` 처럼 `dist/<이름>/` 로 이동해 `--notebook predict.ipynb` 로 지정하십시오.
+- 참여키는 노트북에 적지 않습니다. 환경변수 `AIF_API_KEY` 가 없으면 입력창이 뜹니다 (노트북은 서버로 올라갑니다).
+- `--debug` : 공개 디버그 데이터로 실행되고 실행 로그를 제출 이력에서 볼 수 있습니다. 리더보드 미반영, 하루 횟수 제한.
+  새 코드는 먼저 디버그 제출로 서버에서 도는지 확인하십시오.
+- 로컬 Jupyter 에서는 **디스크에 저장된** 노트북이 올라갑니다. 저장 후 제출하십시오.
+- 터미널에서도 됩니다: `cd dist/<이름> && aifactory submit --notebook predict.ipynb --model-name <이름> [--debug]`
+
 ## 작업 순서
 
 ```bash
-pip install -r requirements-dev.txt
+# (환경 설정 후)
 cp <베이스라인패키지>/assets/model/unet_r18_cd.pt submission/assets/model/
 BASE=submission/assets/model/unet_r18_cd.pt
 ```

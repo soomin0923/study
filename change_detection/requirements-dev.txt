@@ -1,4 +1,4 @@
-# 학습·분석용 (제출용 requirements.txt 는 build_submission.py 가 따로 생성)
+# 로컬 학습·분석·제출용. torch 는 GPU 에 맞는 휠을 먼저 설치하십시오 (README '환경 설정').
 torch>=2.5
 segmentation-models-pytorch>=0.5
 numpy
@@ -7,4 +7,6 @@ shapely>=2.0
 nbformat
 nbconvert
 ipykernel
+jupyterlab
 pytest
+aifactory
