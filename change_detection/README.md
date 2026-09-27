@@ -32,6 +32,7 @@ scripts/
   prepare_aihub.py (pair: 실제 전/후 쌍 / synth: 한 시점 영상에서 변화 합성)
   build_submission.py  validate_submission.py  probe_calc.py  _notebook_src.py
 notebooks/workflow.ipynb   학습 → zip → 리허설 → (디버그)제출을 한 노트북에서
+notebooks/aihub_colab.ipynb  AIHub 71363 Skyset 을 Colab 에서 바로 받기 (필요한 파일만, 분할 병합·해제 포함)
 tests/  test_kit.py  smoke_e2e.sh  make_synthetic.py
 ```
 
