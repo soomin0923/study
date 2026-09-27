@@ -32,7 +32,8 @@ scripts/
   prepare_aihub.py (pair: 실제 전/후 쌍 / synth: 한 시점 영상에서 변화 합성)
   build_submission.py  validate_submission.py  probe_calc.py  _notebook_src.py
 notebooks/workflow.ipynb   학습 → zip → 리허설 → (디버그)제출을 한 노트북에서
-notebooks/aihub_colab.ipynb  AIHub 71363 Skyset 을 Colab 에서 바로 받기 (필요한 파일만, 분할 병합·해제 포함)
+notebooks/colab_train.ipynb  Drive 의 변환 데이터로 Colab GPU 학습 → 규칙 튜닝 → 제출 zip
+notebooks/aihub_colab.ipynb  (참고) AIHub 다운로드 셀 - 해외 IP 차단으로 Colab 에서는 실패, 국내 리눅스용
 tests/  test_kit.py  smoke_e2e.sh  make_synthetic.py
 ```
 
@@ -82,6 +83,21 @@ python -c "import torch; print(torch.cuda.is_available())"           # True 여�
   새 코드는 먼저 디버그 제출로 서버에서 도는지 확인하십시오.
 - 로컬 Jupyter 에서는 **디스크에 저장된** 노트북이 올라갑니다. 저장 후 제출하십시오.
 - 터미널에서도 됩니다: `cd dist/<이름> && aifactory submit --notebook predict.ipynb --model-name <이름> [--debug]`
+
+## AIHub 71363 활용 (주최 측 참고 데이터)
+
+샘플 분석 결과: Skyset 0.5m, 1024x1024, 같은 타일이 여러 날짜(7~12월)로 촬영됨.
+라벨은 날짜별 토지피복(10 건물, 20 하천, 30 도로, 40 논, 60 산림, 100 비대상지)이고, **두 날짜 사이 건물 등 라벨이 똑같이 복사되어 있어
+'변화 라벨'로 쓸 수 없습니다.** 그래서 `prepare_aihub71363.py` 는
+실제 두 날짜 사진 쌍(= 진짜 계절·그림자·시차 차이가 있는 '변화 없음')에 건물 삭제(증축)·산림 맨땅화(벌목)를 합성하고,
+비대상지는 학습에서 무시합니다. AIHub 는 해외 IP 다운로드를 막으므로 받기와 변환은 국내 PC에서 합니다.
+
+```bash
+python scripts/merge_parts.py <받은폴더> --delete
+python scripts/prepare_aihub71363.py --images <VS_02 원천> --labels <VL_01 라벨> --out data/aihub_val
+python scripts/prepare_aihub71363.py --images <TS_02 원천> --labels <TL_01 라벨> --out data/aihub_train --windows 3 --max-pairs 1
+```
+원천이 16비트·4밴드면 영상별로 2~98% 늘려 8비트로 바꾸고, `--bands` 로 RGB 밴드를 고릅니다 (첫 타일에서 형식을 출력).
 
 ## 작업 순서
 
