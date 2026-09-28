@@ -32,6 +32,7 @@ scripts/
   prepare_aihub.py (pair: 실제 전/후 쌍 / synth: 한 시점 영상에서 변화 합성)
   build_submission.py  validate_submission.py  probe_calc.py  _notebook_src.py
 notebooks/workflow.ipynb   학습 → zip → 리허설 → (디버그)제출을 한 노트북에서
+notebooks/aihub_download_local.ipynb  로컬 Jupyter: API 키 입력 → AIHub 받기(파이썬만, WSL 불필요) → 병합·해제 → 변환 → Drive 용 zip
 notebooks/colab_train.ipynb  Drive 의 변환 데이터로 Colab GPU 학습 → 규칙 튜닝 → 제출 zip
 notebooks/aihub_colab.ipynb  (참고) AIHub 다운로드 셀 - 해외 IP 차단으로 Colab 에서는 실패, 국내 리눅스용
 tests/  test_kit.py  smoke_e2e.sh  make_synthetic.py

@@ -4,6 +4,8 @@ segmentation-models-pytorch>=0.5
 numpy
 opencv-python-headless
 shapely>=2.0
+tifffile
+requests
 nbformat
 nbconvert
 ipykernel
